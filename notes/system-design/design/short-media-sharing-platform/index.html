@@ -1,39 +1,1304 @@
-<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="ie=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><link rel=preload as=font href=/fonts/vendor/jost/jost-v4-latin-regular.woff2 type=font/woff2 crossorigin><link rel=preload as=font href=/fonts/vendor/jost/jost-v4-latin-500.woff2 type=font/woff2 crossorigin><link rel=preload as=font href=/fonts/vendor/jost/jost-v4-latin-700.woff2 type=font/woff2 crossorigin><script>(()=>{var t=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,e=localStorage.getItem("theme");t&&e===null&&(localStorage.setItem("theme","dark"),document.documentElement.setAttribute("data-dark-mode","")),t&&e==="dark"&&document.documentElement.setAttribute("data-dark-mode",""),e==="dark"&&document.documentElement.setAttribute("data-dark-mode","")})()</script><link rel=stylesheet href=/main.db0cbc79d6769359ce0a99330505162bf8e22f22410e79df55f52db337ffca409e3853d54511556a15772cad1fed4d22b653ae3f3768d0bf110f7884adfbbc29.css integrity="sha512-2wy8edZ2k1nOCpkzBQUWK/jiLyJBDnnfVfUtszf/ykCeOFPVRRFVahV3LK0f7U0itlOuPzdo0L8RD3iErfu8KQ==" crossorigin=anonymous><noscript><style>img.lazyload{display:none}</style></noscript><meta name=robots content="index, follow"><meta name=googlebot content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"><meta name=bingbot content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"><title>Short Media Sharing Platform | iliyaML</title><meta name=description content="Notes from grokking system design
+<!doctype html>
+<html lang="en-US">
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="preload" as="font" href="/fonts/vendor/jost/jost-v4-latin-regular.woff2" type="font/woff2" crossorigin>
+<link rel="preload" as="font" href="/fonts/vendor/jost/jost-v4-latin-500.woff2" type="font/woff2" crossorigin>
+<link rel="preload" as="font" href="/fonts/vendor/jost/jost-v4-latin-700.woff2" type="font/woff2" crossorigin>
+
+  <script>(()=>{var t=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,e=localStorage.getItem("theme");t&&e===null&&(localStorage.setItem("theme","dark"),document.documentElement.setAttribute("data-dark-mode","")),t&&e==="dark"&&document.documentElement.setAttribute("data-dark-mode",""),e==="dark"&&document.documentElement.setAttribute("data-dark-mode","")})()</script>
+
+  <link rel="stylesheet" href="/main.92c80ad23243dd5f2400ab0e9e794051477a29162f47306f46ef2df68041d3633a166efd0bc34ba34b3d54760fa94692193970019875b1278527741daaf0bb0c.css" integrity="sha512-ksgK0jJD3V8kAKsOnnlAUUd6KRYvRzBvRu8t9oBB02M6Fm79C8NLo0s9VHYPqUaSGTlwAZh1sSeFJ3QdqvC7DA==" crossorigin="anonymous">
+<noscript><style>img.lazyload { display: none; }</style></noscript>
+  <meta name="robots" content="index, follow">
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <title>Short Media Sharing Platform | iliyaML</title>
+<meta name="description" content="Notes from grokking system design
 Services: Instagram, TikTok
-System Requirements / Goals #Functional Requirements Upload, download, view photos and short videos Video or photo metadata search Able to follow other users Non-functional Requirements High availability Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine High reliability (media is never lost) Acceptable latency (loading media) Capacity Estimation / Constraints #Read-heavy system Users Total Users: 500 M Daily Active Users (DAU): 1 M Storage For 1 Day: 2 M Uploaded Media * 200 KB average file size = 400 GB / day For 10 years: 400 GB / day * 365 days * 10 years = ~1425 TB High Level System Design #(Write) Upload media service (Read) View/Search media service Object storage servers - store media Database servers - store media metadata and users metadata Database Schema #Media MediaID int PK MediaPath varchar CreationDate datetime User UserID int PK Name varchar Email varchar DateOfBirth datetime CreationDate datetime LastLogin datetime UserFollow UserID1 int PK UserID2 int PK Relational Database Require joins Challenge to scale the application NoSQL Database Distributed key-value store Schema Media User UserFollow Apache Cassandra Maintain replicas for high reliability Media Data Store Distributed File Storage (HDFS) Distributed Object Storage (Amazon S3) Component Design #Split reads and writes to separate servers, avoid overload, scale independently (Microservices) Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this) (Write) Upload media service Slow, reads from disk (Read) View media service Faster, especially served from cache Reliability and Redundancy #High Availability and Reliability - Store multiple copies of media Multiple copies of the services, system will run even if one instance of a service dies Eliminate single PoF Data Sharding #Metadata Sharding (Options) Based on UserID (Not recommended) Based on MediaID Generate unique MediaIDs first and then find a shard number through MediaID % 10 servers Generate MediaIDs Dedicate a separate database instance to generate auto-incrementing IDs Define a table containing only an ID field As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media Single PoF?"><link rel=canonical href=/notes/system-design/design/short-media-sharing-platform/><meta property="og:locale" content><meta property="og:type" content="article"><meta property="og:title" content="Short Media Sharing Platform"><meta property="og:description" content="Notes from grokking system design
+System Requirements / Goals #Functional Requirements Upload, download, view photos and short videos Video or photo metadata search Able to follow other users Non-functional Requirements High availability Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine High reliability (media is never lost) Acceptable latency (loading media) Capacity Estimation / Constraints #Read-heavy system Users Total Users: 500 M Daily Active Users (DAU): 1 M Storage For 1 Day: 2 M Uploaded Media * 200 KB average file size = 400 GB / day For 10 years: 400 GB / day * 365 days * 10 years = ~1425 TB High Level System Design #(Write) Upload media service (Read) View/Search media service Object storage servers - store media Database servers - store media metadata and users metadata Database Schema #Media MediaID int PK MediaPath varchar CreationDate datetime User UserID int PK Name varchar Email varchar DateOfBirth datetime CreationDate datetime LastLogin datetime UserFollow UserID1 int PK UserID2 int PK Relational Database Require joins Challenge to scale the application NoSQL Database Distributed key-value store Schema Media User UserFollow Apache Cassandra Maintain replicas for high reliability Media Data Store Distributed File Storage (HDFS) Distributed Object Storage (Amazon S3) Component Design #Split reads and writes to separate servers, avoid overload, scale independently (Microservices) Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this) (Write) Upload media service Slow, reads from disk (Read) View media service Faster, especially served from cache Reliability and Redundancy #High Availability and Reliability - Store multiple copies of media Multiple copies of the services, system will run even if one instance of a service dies Eliminate single PoF Data Sharding #Metadata Sharding (Options) Based on UserID (Not recommended) Based on MediaID Generate unique MediaIDs first and then find a shard number through MediaID % 10 servers Generate MediaIDs Dedicate a separate database instance to generate auto-incrementing IDs Define a table containing only an ID field As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media Single PoF?">
+  <link rel="canonical" href="/notes/system-design/design/short-media-sharing-platform/">
+<meta property="og:locale" content="">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Short Media Sharing Platform">
+<meta property="og:description" content="Notes from grokking system design
 Services: Instagram, TikTok
-System Requirements / Goals #Functional Requirements Upload, download, view photos and short videos Video or photo metadata search Able to follow other users Non-functional Requirements High availability Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine High reliability (media is never lost) Acceptable latency (loading media) Capacity Estimation / Constraints #Read-heavy system Users Total Users: 500 M Daily Active Users (DAU): 1 M Storage For 1 Day: 2 M Uploaded Media * 200 KB average file size = 400 GB / day For 10 years: 400 GB / day * 365 days * 10 years = ~1425 TB High Level System Design #(Write) Upload media service (Read) View/Search media service Object storage servers - store media Database servers - store media metadata and users metadata Database Schema #Media MediaID int PK MediaPath varchar CreationDate datetime User UserID int PK Name varchar Email varchar DateOfBirth datetime CreationDate datetime LastLogin datetime UserFollow UserID1 int PK UserID2 int PK Relational Database Require joins Challenge to scale the application NoSQL Database Distributed key-value store Schema Media User UserFollow Apache Cassandra Maintain replicas for high reliability Media Data Store Distributed File Storage (HDFS) Distributed Object Storage (Amazon S3) Component Design #Split reads and writes to separate servers, avoid overload, scale independently (Microservices) Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this) (Write) Upload media service Slow, reads from disk (Read) View media service Faster, especially served from cache Reliability and Redundancy #High Availability and Reliability - Store multiple copies of media Multiple copies of the services, system will run even if one instance of a service dies Eliminate single PoF Data Sharding #Metadata Sharding (Options) Based on UserID (Not recommended) Based on MediaID Generate unique MediaIDs first and then find a shard number through MediaID % 10 servers Generate MediaIDs Dedicate a separate database instance to generate auto-incrementing IDs Define a table containing only an ID field As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media Single PoF?"><meta property="og:url" content="/notes/system-design/design/short-media-sharing-platform/"><meta property="og:site_name" content="iliyaML"><meta name=twitter:card content="summary_large_image"><meta name=twitter:site content><meta name=twitter:creator content><meta name=twitter:title content="Short Media Sharing Platform"><meta name=twitter:description content><meta name=twitter:card content="summary"><meta name=twitter:image:alt content="Short Media Sharing Platform"><script type=application/ld+json>{"@context":"https://schema.org","@graph":[{"@type":"Person","@id":"/#/schema/person/1","name":"","url":"/","sameAs":[],"image":{"@type":"ImageObject","@id":"/#/schema/image/1","url":"/\u003cnil\u003e","width":null,"height":null,"caption":""}},{"@type":"WebSite","@id":"/#/schema/website/1","url":"/","name":"iliyaML","description":"Hi, I’m Iliya 👋","publisher":{"@id":"/#/schema/person/1"}},{"@type":"WebPage","@id":"/notes/system-design/design/short-media-sharing-platform/","url":"/notes/system-design/design/short-media-sharing-platform/","name":"Short Media Sharing Platform","description":"","isPartOf":{"@id":"/#/schema/website/1"},"about":{"@id":"/#/schema/person/1"},"datePublished":"0001-01-01T00:00:00CET","dateModified":"0001-01-01T00:00:00CET","breadcrumb":{"@id":"/notes/system-design/design/short-media-sharing-platform/#/schema/breadcrumb/1"},"primaryImageOfPage":{"@id":"/notes/system-design/design/short-media-sharing-platform/#/schema/image/2"},"inLanguage":"","potentialAction":[{"@type":"ReadAction","target":["/notes/system-design/design/short-media-sharing-platform/"]}]},{"@type":"BreadcrumbList","@id":"/notes/system-design/design/short-media-sharing-platform/#/schema/breadcrumb/1","name":"Breadcrumbs","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"WebPage","@id":"/","url":"/","name":"Home"}},{"@type":"ListItem","position":2,"item":{"@id":"/notessystem-designdesignshort-media-sharing-platform/"}}]},{"@context":"https://schema.org","@graph":[{"@type":"ImageObject","@id":"/notes/system-design/design/short-media-sharing-platform/#/schema/image/2","url":null,"contentUrl":null,"caption":"Short Media Sharing Platform"}]}]}</script><meta name=theme-color content="#fff"><link rel=icon href=/favicon.ico sizes=any><link rel=icon type=image/svg+xml href=/favicon.svg><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest crossorigin=use-credentials href=/site.webmanifest></head><body class="notes single"><div class=sticky-top><div class=header-bar></div><header class="navbar navbar-expand-lg navbar-light doks-navbar"><nav class="container-xxl flex-wrap flex-lg-nowrap" aria-label="Main navigation"><a class="navbar-brand order-0" href=/ aria-label=iliyaML>iliyaML</a>
-<button class="btn btn-link order-0 ms-auto d-lg-none" type=button data-bs-toggle=offcanvas data-bs-target=#offcanvasExample aria-controls=offcanvasExample><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-horizontal"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button><div class="offcanvas offcanvas-start d-lg-none" tabindex=-1 id=offcanvasExample aria-labelledby=offcanvasExampleLabel><div class=header-bar></div><div class=offcanvas-header><h5 class=offcanvas-title id=offcanvasExampleLabel>Browse notes</h5><button type=button class=btn-close data-bs-dismiss=offcanvas aria-label=Close></button></div><div class=offcanvas-body><aside class="doks-sidebar mt-n3"><nav id=doks-docs-nav aria-label="Tertiary navigation"><ul class="list-unstyled collapsible-sidebar"><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-091fa9121c047db1dd48c3e2ab5f3c91 aria-expanded=false>
-Machine Learning</button><div class=collapse id=section-091fa9121c047db1dd48c3e2ab5f3c91><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/machine-learning/k-nearest-neighbors/>K-Nearest Neighbors (KNN)</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/linear-regression/>Linear Regression</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/logistic-regression/>Logistic Regression</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-6a68b6412b3d8a605c374d3c59e02694 aria-expanded=false>
-Deep Learning</button><div class=collapse id=section-6a68b6412b3d8a605c374d3c59e02694><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/deep-learning/neural-networks/>Neural Networks</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-85587c49afa2ea2adacd4bbcdb57d064 aria-expanded=false>
-NLP</button><div class=collapse id=section-85587c49afa2ea2adacd4bbcdb57d064><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/nlp/papers/>Papers</a></li><li><a class="docs-link rounded" href=/notes/nlp/attention-is-all-you-need/>Attention is All You Need (2017)</a></li><li><a class="docs-link rounded" href=/notes/nlp/state-of-gpt-2023/>State of GPT (2023)</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-c33e404a441c6ba9648f88af3c68a1ca aria-expanded=false>
-Statistics</button><div class=collapse id=section-c33e404a441c6ba9648f88af3c68a1ca><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/statistics/introduction/>Introduction</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-89320dbd4e0a792bc1676fde2d5bccfc aria-expanded=false>
-DSA</button><div class=collapse id=section-89320dbd4e0a792bc1676fde2d5bccfc><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/dsa/data-structures-and-algorithms/>Data Structures & Algorithms</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-cf60bbd0cd4942a6ce81e76d7fb05b7b aria-expanded=true>
-Sytem Design</button><div class="collapse show" id=section-cf60bbd0cd4942a6ce81e76d7fb05b7b><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-0460583622f03a52d7693094d6fa2452 aria-expanded=false>
-Concepts</button><div class=collapse id=section-0460583622f03a52d7693094d6fa2452><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/concepts/basics/>Basics</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/20-concepts/>20 Concepts</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/25-golden-rules/>25 Golden Rules</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/key-steps/>Key Steps</a></li></ul></div></li><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-1afa74da05ca145d3418aad9af510109 aria-expanded=true>
-Design</button><div class="collapse show" id=section-1afa74da05ca145d3418aad9af510109><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/design/url-shortener/>URL Shortener</a></li><li><a class="docs-link rounded active" href=/notes/system-design/design/short-media-sharing-platform/>Short Media Sharing Platform</a></li><li><a class="docs-link rounded" href=/notes/system-design/design/video-streaming-platform/>Video Streaming Platform</a></li></ul></div></li></ul></div></li></ul></nav></aside></div></div><button class="btn btn-menu order-2 d-block d-lg-none" type=button data-bs-toggle=offcanvas data-bs-target=#offcanvasDoks aria-controls=offcanvasDoks aria-label="Open main menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="offcanvas offcanvas-end border-0 py-lg-1" tabindex=-1 id=offcanvasDoks data-bs-backdrop=true aria-labelledby=offcanvasDoksLabel><div class="header-bar d-lg-none"></div><div class="offcanvas-header d-lg-none"><h2 class="h5 offcanvas-title ps-2" id=offcanvasDoksLabel><a class=text-dark href=/>iliyaML</a></h2><button type=button class="btn-close text-reset me-2" data-bs-dismiss=offcanvas aria-label="Close main menu"></button></div><div class="offcanvas-body p-4 p-lg-0"><ul class="nav flex-column flex-lg-row align-items-lg-center mt-2 mt-lg-0 ms-lg-2 me-lg-auto"><li class=nav-item><a class="nav-link ps-0 py-1" href=/about/>About</a></li><li class=nav-item><a class="nav-link ps-0 py-1 active" href=/notes/machine-learning/k-nearest-neighbors>Notes</a></li></ul><hr class="text-black-50 my-4 d-lg-none"><form class="doks-search position-relative flex-grow-1 ms-lg-auto me-lg-2"><input id=search class="form-control is-search" type=search placeholder=Search... aria-label=Search... autocomplete=off><div id=suggestions class="shadow bg-white rounded d-none"></div></form><hr class="text-black-50 my-4 d-lg-none"><ul class="nav flex-column flex-lg-row"><li class=nav-item><a class="nav-link social-link" href=https://github.com/iliyaML><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-github"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37.0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44.0 0020 4.77 5.07 5.07.0 0019.91 1S18.73.65 16 2.48a13.38 13.38.0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07.0 005 4.77 5.44 5.44.0 003.5 8.55c0 5.42 3.3 6.61 6.44 7A3.37 3.37.0 009 18.13V22"/></svg><small class="ms-2 d-lg-none">GitHub</small></a></li><li class=nav-item><a class="nav-link social-link" href=https://www.linkedin.com/in/iliya-mohamad-lokman><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-linkedin"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg><small class="ms-2 d-lg-none">LinkedIn</small></a></li></ul><hr class="text-black-50 my-4 d-lg-none"><button id=mode class="btn btn-link" type=button aria-label="Toggle user interface mode">
-<span class=toggle-dark><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-moon"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></span><span class=toggle-light><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-sun"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span></button></div></div></nav></header></div><div class=container-xxl><aside class=doks-sidebar><nav id=doks-docs-nav class="collapse d-lg-none" aria-label="Tertiary navigation"><ul class="list-unstyled collapsible-sidebar"><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-091fa9121c047db1dd48c3e2ab5f3c91 aria-expanded=false>
-Machine Learning</button><div class=collapse id=section-091fa9121c047db1dd48c3e2ab5f3c91><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/machine-learning/k-nearest-neighbors/>K-Nearest Neighbors (KNN)</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/linear-regression/>Linear Regression</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/logistic-regression/>Logistic Regression</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-6a68b6412b3d8a605c374d3c59e02694 aria-expanded=false>
-Deep Learning</button><div class=collapse id=section-6a68b6412b3d8a605c374d3c59e02694><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/deep-learning/neural-networks/>Neural Networks</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-85587c49afa2ea2adacd4bbcdb57d064 aria-expanded=false>
-NLP</button><div class=collapse id=section-85587c49afa2ea2adacd4bbcdb57d064><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/nlp/papers/>Papers</a></li><li><a class="docs-link rounded" href=/notes/nlp/attention-is-all-you-need/>Attention is All You Need (2017)</a></li><li><a class="docs-link rounded" href=/notes/nlp/state-of-gpt-2023/>State of GPT (2023)</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-c33e404a441c6ba9648f88af3c68a1ca aria-expanded=false>
-Statistics</button><div class=collapse id=section-c33e404a441c6ba9648f88af3c68a1ca><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/statistics/introduction/>Introduction</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-89320dbd4e0a792bc1676fde2d5bccfc aria-expanded=false>
-DSA</button><div class=collapse id=section-89320dbd4e0a792bc1676fde2d5bccfc><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/dsa/data-structures-and-algorithms/>Data Structures & Algorithms</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-cf60bbd0cd4942a6ce81e76d7fb05b7b aria-expanded=true>
-Sytem Design</button><div class="collapse show" id=section-cf60bbd0cd4942a6ce81e76d7fb05b7b><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-0460583622f03a52d7693094d6fa2452 aria-expanded=false>
-Concepts</button><div class=collapse id=section-0460583622f03a52d7693094d6fa2452><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/concepts/basics/>Basics</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/20-concepts/>20 Concepts</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/25-golden-rules/>25 Golden Rules</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/key-steps/>Key Steps</a></li></ul></div></li><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-1afa74da05ca145d3418aad9af510109 aria-expanded=true>
-Design</button><div class="collapse show" id=section-1afa74da05ca145d3418aad9af510109><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/design/url-shortener/>URL Shortener</a></li><li><a class="docs-link rounded active" href=/notes/system-design/design/short-media-sharing-platform/>Short Media Sharing Platform</a></li><li><a class="docs-link rounded" href=/notes/system-design/design/video-streaming-platform/>Video Streaming Platform</a></li></ul></div></li></ul></div></li></ul></nav></aside></div><div class="wrap container-xxl" role=document><div class=content><div class="row flex-xl-nowrap"><div class="col-lg-5 col-xl-4 docs-sidebar d-none d-lg-block"><nav class=docs-links aria-label="Main navigation"><ul class="list-unstyled collapsible-sidebar"><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-091fa9121c047db1dd48c3e2ab5f3c91 aria-expanded=false>
-Machine Learning</button><div class=collapse id=section-091fa9121c047db1dd48c3e2ab5f3c91><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/machine-learning/k-nearest-neighbors/>K-Nearest Neighbors (KNN)</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/linear-regression/>Linear Regression</a></li><li><a class="docs-link rounded" href=/notes/machine-learning/logistic-regression/>Logistic Regression</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-6a68b6412b3d8a605c374d3c59e02694 aria-expanded=false>
-Deep Learning</button><div class=collapse id=section-6a68b6412b3d8a605c374d3c59e02694><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/deep-learning/neural-networks/>Neural Networks</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-85587c49afa2ea2adacd4bbcdb57d064 aria-expanded=false>
-NLP</button><div class=collapse id=section-85587c49afa2ea2adacd4bbcdb57d064><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/nlp/papers/>Papers</a></li><li><a class="docs-link rounded" href=/notes/nlp/attention-is-all-you-need/>Attention is All You Need (2017)</a></li><li><a class="docs-link rounded" href=/notes/nlp/state-of-gpt-2023/>State of GPT (2023)</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-c33e404a441c6ba9648f88af3c68a1ca aria-expanded=false>
-Statistics</button><div class=collapse id=section-c33e404a441c6ba9648f88af3c68a1ca><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/statistics/introduction/>Introduction</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-89320dbd4e0a792bc1676fde2d5bccfc aria-expanded=false>
-DSA</button><div class=collapse id=section-89320dbd4e0a792bc1676fde2d5bccfc><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/dsa/data-structures-and-algorithms/>Data Structures & Algorithms</a></li></ul></div></li><li class=mb-1><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-cf60bbd0cd4942a6ce81e76d7fb05b7b aria-expanded=true>
-Sytem Design</button><div class="collapse show" id=section-cf60bbd0cd4942a6ce81e76d7fb05b7b><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-0460583622f03a52d7693094d6fa2452 aria-expanded=false>
-Concepts</button><div class=collapse id=section-0460583622f03a52d7693094d6fa2452><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/concepts/basics/>Basics</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/20-concepts/>20 Concepts</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/25-golden-rules/>25 Golden Rules</a></li><li><a class="docs-link rounded" href=/notes/system-design/concepts/key-steps/>Key Steps</a></li></ul></div></li><li class="my-1 ms-3"><button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle=collapse data-bs-target=#section-1afa74da05ca145d3418aad9af510109 aria-expanded=true>
-Design</button><div class="collapse show" id=section-1afa74da05ca145d3418aad9af510109><ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small"><li><a class="docs-link rounded" href=/notes/system-design/design/url-shortener/>URL Shortener</a></li><li><a class="docs-link rounded active" href=/notes/system-design/design/short-media-sharing-platform/>Short Media Sharing Platform</a></li><li><a class="docs-link rounded" href=/notes/system-design/design/video-streaming-platform/>Video Streaming Platform</a></li></ul></div></li></ul></div></li></ul></nav></div><nav class="docs-toc d-none d-xl-block col-xl-3" aria-label="Secondary navigation"><div class=d-xl-none><button class="btn btn-outline-primary btn-sm doks-toc-toggle collapsed" type=button data-bs-toggle=collapse data-bs-target=#onThisPage aria-controls=doks-docs-nav aria-expanded=false aria-label="Toggle On this page navigation">
-<span>On this page</span>
-<span><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-expand" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Expand</title><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-collapse" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Collapse</title><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg></span></button><div class=collapse id=onThisPage><div class="card card-body mt-3 py-1"><div class=page-links><nav id=TableOfContents><ul><li><a href=#system-requirements--goals>System Requirements / Goals</a></li><li><a href=#capacity-estimation--constraints>Capacity Estimation / Constraints</a></li><li><a href=#high-level-system-design>High Level System Design</a></li><li><a href=#database-schema>Database Schema</a></li><li><a href=#component-design>Component Design</a></li><li><a href=#reliability-and-redundancy>Reliability and Redundancy</a></li><li><a href=#data-sharding>Data Sharding</a></li><li><a href=#cache-and-load-balancing>Cache and Load Balancing</a></li></ul></nav></div></div></div></div><div class="page-links d-none d-xl-block"><h3>On this page</h3><nav id=TableOfContents><ul><li><a href=#system-requirements--goals>System Requirements / Goals</a></li><li><a href=#capacity-estimation--constraints>Capacity Estimation / Constraints</a></li><li><a href=#high-level-system-design>High Level System Design</a></li><li><a href=#database-schema>Database Schema</a></li><li><a href=#component-design>Component Design</a></li><li><a href=#reliability-and-redundancy>Reliability and Redundancy</a></li><li><a href=#data-sharding>Data Sharding</a></li><li><a href=#cache-and-load-balancing>Cache and Load Balancing</a></li></ul></nav></div></nav><main class="docs-content col-lg-11 col-xl-9 mx-xl-auto"><h1>Short Media Sharing Platform</h1><p class=lead></p><nav class=d-xl-none aria-label="Quaternary navigation"><div class=d-xl-none><button class="btn btn-outline-primary btn-sm doks-toc-toggle collapsed" type=button data-bs-toggle=collapse data-bs-target=#onThisPage aria-controls=doks-docs-nav aria-expanded=false aria-label="Toggle On this page navigation">
-<span>On this page</span>
-<span><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-expand" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Expand</title><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-collapse" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Collapse</title><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg></span></button><div class=collapse id=onThisPage><div class="card card-body mt-3 py-1"><div class=page-links><nav id=TableOfContents><ul><li><a href=#system-requirements--goals>System Requirements / Goals</a></li><li><a href=#capacity-estimation--constraints>Capacity Estimation / Constraints</a></li><li><a href=#high-level-system-design>High Level System Design</a></li><li><a href=#database-schema>Database Schema</a></li><li><a href=#component-design>Component Design</a></li><li><a href=#reliability-and-redundancy>Reliability and Redundancy</a></li><li><a href=#data-sharding>Data Sharding</a></li><li><a href=#cache-and-load-balancing>Cache and Load Balancing</a></li></ul></nav></div></div></div></div><div class="page-links d-none d-xl-block"><h3>On this page</h3><nav id=TableOfContents><ul><li><a href=#system-requirements--goals>System Requirements / Goals</a></li><li><a href=#capacity-estimation--constraints>Capacity Estimation / Constraints</a></li><li><a href=#high-level-system-design>High Level System Design</a></li><li><a href=#database-schema>Database Schema</a></li><li><a href=#component-design>Component Design</a></li><li><a href=#reliability-and-redundancy>Reliability and Redundancy</a></li><li><a href=#data-sharding>Data Sharding</a></li><li><a href=#cache-and-load-balancing>Cache and Load Balancing</a></li></ul></nav></div></nav><p>Notes from <a href=https://www.educative.io/>grokking system design</a></p><p>Services: Instagram, TikTok</p><h2 id=system-requirements--goals>System Requirements / Goals <a href=#system-requirements--goals class=anchor aria-hidden=true>#</a></h2><ul><li>Functional Requirements<ul><li>Upload, download, view photos and short videos</li><li>Video or photo metadata search</li><li>Able to follow other users</li></ul></li><li>Non-functional Requirements<ul><li>High availability<ul><li>Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine</li></ul></li><li>High reliability (media is never lost)</li><li>Acceptable latency (loading media)</li></ul></li></ul><h2 id=capacity-estimation--constraints>Capacity Estimation / Constraints <a href=#capacity-estimation--constraints class=anchor aria-hidden=true>#</a></h2><ul><li>Read-heavy system</li><li>Users<ul><li>Total Users: 500 M</li><li><code>Daily Active Users (DAU): 1 M</code></li></ul></li><li>Storage<ul><li>For 1 Day: <code>2 M Uploaded Media * 200 KB average file size = 400 GB / day</code></li><li>For 10 years: <code>400 GB / day * 365 days * 10 years = ~1425 TB</code></li></ul></li></ul><h2 id=high-level-system-design>High Level System Design <a href=#high-level-system-design class=anchor aria-hidden=true>#</a></h2><ul><li>(Write) Upload media service</li><li>(Read) View/Search media service</li><li>Object storage servers - store media</li><li>Database servers - store media metadata and users metadata</li></ul><h2 id=database-schema>Database Schema <a href=#database-schema class=anchor aria-hidden=true>#</a></h2><table><thead><tr><th>Media</th><th></th></tr></thead><tbody><tr><td>MediaID</td><td>int PK</td></tr><tr><td>MediaPath</td><td>varchar</td></tr><tr><td>CreationDate</td><td>datetime</td></tr></tbody></table><table><thead><tr><th>User</th><th></th></tr></thead><tbody><tr><td>UserID</td><td>int PK</td></tr><tr><td>Name</td><td>varchar</td></tr><tr><td>Email</td><td>varchar</td></tr><tr><td>DateOfBirth</td><td>datetime</td></tr><tr><td>CreationDate</td><td>datetime</td></tr><tr><td>LastLogin</td><td>datetime</td></tr></tbody></table><table><thead><tr><th>UserFollow</th><th></th></tr></thead><tbody><tr><td>UserID1</td><td>int PK</td></tr><tr><td>UserID2</td><td>int PK</td></tr></tbody></table><ul><li>Relational Database<ul><li>Require joins</li><li>Challenge to scale the application</li></ul></li><li>NoSQL Database<ul><li>Distributed key-value store</li><li>Schema<ul><li>Media</li><li>User</li><li>UserFollow</li></ul></li><li>Apache Cassandra<ul><li>Maintain replicas for high reliability</li></ul></li></ul></li><li>Media Data Store<ul><li>Distributed File Storage (HDFS)</li><li>Distributed Object Storage (Amazon S3)</li></ul></li></ul><h2 id=component-design>Component Design <a href=#component-design class=anchor aria-hidden=true>#</a></h2><ul><li>Split reads and writes to separate servers, avoid overload, scale independently (Microservices)<ul><li>Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this)<ul><li>(Write) Upload media service<ul><li>Slow, reads from disk</li></ul></li><li>(Read) View media service<ul><li>Faster, especially served from cache</li></ul></li></ul></li></ul></li></ul><h2 id=reliability-and-redundancy>Reliability and Redundancy <a href=#reliability-and-redundancy class=anchor aria-hidden=true>#</a></h2><ul><li>High Availability and Reliability - Store multiple copies of media</li><li>Multiple copies of the services, system will run even if one instance of a service dies</li><li>Eliminate single PoF</li></ul><h2 id=data-sharding>Data Sharding <a href=#data-sharding class=anchor aria-hidden=true>#</a></h2><ul><li>Metadata Sharding (Options)<ol><li>Based on UserID (Not recommended)</li><li>Based on MediaID<ol><li>Generate unique MediaIDs first and then find a shard number through Media<code>ID % 10 servers</code></li></ol></li></ol></li><li>Generate MediaIDs<ul><li>Dedicate a separate database instance to generate auto-incrementing IDs</li><li>Define a table containing only an ID field</li><li>As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media</li><li>Single PoF?<ul><li>Two DB instance, one generating even numbers, one generating odd numbers</li><li>Design can be extended for Users, Media-Comments</li></ul></li></ul></li></ul><h2 id=cache-and-load-balancing>Cache and Load Balancing <a href=#cache-and-load-balancing class=anchor aria-hidden=true>#</a></h2><ul><li>Need large-scale media delivery system (Global)</li><li>Pareto Principle: 80-20 rule<ul><li>20% of daily read volume for media is generating 80% of traffic</li><li>Cache 20% of media files and metadata</li></ul></li><li>CDN for static assets<ul><li>Geographically distributed cache servers</li><li>Push content closer to the user</li></ul></li><li>Cache for Metadata<ul><li>Cache hot database rows</li><li>Memcached</li><li>Application servers check cache first before hitting DB</li><li>Cache Eviction Policy: LRU</li></ul></li></ul><div class="page-footer-meta d-flex flex-column flex-md-row justify-content-between"></div><div class="docs-navigation d-flex justify-content-between"><a href=/notes/system-design/design/url-shortener/><div class="card my-1"><div class="card-body py-2">&larr; URL Shortener</div></div></a><a class=ms-auto href=/notes/system-design/design/video-streaming-platform/><div class="card my-1"><div class="card-body py-2">Video Streaming Platform &rarr;</div></div></a></div></main></div></div></div><script async src="https://www.googletagmanager.com/gtag/js?id=G-X0X8EQ5BBE"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-X0X8EQ5BBE")</script><footer class="footer text-muted"><div class=container-xxl><div class=row><div class="col-lg-8 order-last order-lg-first"><ul class=list-inline><li class=list-inline-item>© 2023 <a class=text-muted href=/>iliyaML</a></li></ul></div><div class="col-lg-8 order-first order-lg-last text-lg-end"><ul class=list-inline></ul></div></div></div></footer><script src=/js/bootstrap.min.650aeec64c81d69d4c0850fc73c93da3f0330cec0a27772feed7f90f60baa5f47f1c45687d71914bdafd1c4e860d40f6dc08ede27a2f08431ff929c9a2d24621.js integrity="sha512-ZQruxkyB1p1MCFD8c8k9o/AzDOwKJ3cv7tf5D2C6pfR/HEVofXGRS9r9HE6GDUD23Ajt4novCEMf+SnJotJGIQ==" crossorigin=anonymous defer></script>
-<script src=/js/highlight.min.3f0a703c54cbed82ca277187e23cf2d272da28c15ce7e33cde685d40b53d741893d5b74d35bb2d20a81f56c289084f245bdd0c9145d39d7094d3dfbc62d1326a.js integrity="sha512-PwpwPFTL7YLKJ3GH4jzy0nLaKMFc5+M83mhdQLU9dBiT1bdNNbstIKgfVsKJCE8kW90MkUXTnXCU09+8YtEyag==" crossorigin=anonymous defer></script>
-<script src=/main.min.cb2e2ebbf2e4002f3117addc33582923b2b3ae5265c22944cd117ebec7abe61c170417c4506d7a0f8f0fc9053dfdf441421d53601ac467042ff3d06ec0ba07fa.js integrity="sha512-yy4uu/LkAC8xF63cM1gpI7KzrlJlwilEzRF+vser5hwXBBfEUG16D48PyQU9/fRBQh1TYBrEZwQv89BuwLoH+g==" crossorigin=anonymous defer></script>
-<script src=/index.min.6c2773fc30bc14a144531616173ce919846c1fb9fcc2155d941186484f886a3c6eb2262cb4e98f77d3138559d14ab51c061460f459f66a882b05df93d6fbf95e.js integrity="sha512-bCdz/DC8FKFEUxYWFzzpGYRsH7n8whVdlBGGSE+IajxusiYstOmPd9MThVnRSrUcBhRg9Fn2aogrBd+T1vv5Xg==" crossorigin=anonymous defer></script></body></html>
+System Requirements / Goals #Functional Requirements Upload, download, view photos and short videos Video or photo metadata search Able to follow other users Non-functional Requirements High availability Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine High reliability (media is never lost) Acceptable latency (loading media) Capacity Estimation / Constraints #Read-heavy system Users Total Users: 500 M Daily Active Users (DAU): 1 M Storage For 1 Day: 2 M Uploaded Media * 200 KB average file size = 400 GB / day For 10 years: 400 GB / day * 365 days * 10 years = ~1425 TB High Level System Design #(Write) Upload media service (Read) View/Search media service Object storage servers - store media Database servers - store media metadata and users metadata Database Schema #Media MediaID int PK MediaPath varchar CreationDate datetime User UserID int PK Name varchar Email varchar DateOfBirth datetime CreationDate datetime LastLogin datetime UserFollow UserID1 int PK UserID2 int PK Relational Database Require joins Challenge to scale the application NoSQL Database Distributed key-value store Schema Media User UserFollow Apache Cassandra Maintain replicas for high reliability Media Data Store Distributed File Storage (HDFS) Distributed Object Storage (Amazon S3) Component Design #Split reads and writes to separate servers, avoid overload, scale independently (Microservices) Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this) (Write) Upload media service Slow, reads from disk (Read) View media service Faster, especially served from cache Reliability and Redundancy #High Availability and Reliability - Store multiple copies of media Multiple copies of the services, system will run even if one instance of a service dies Eliminate single PoF Data Sharding #Metadata Sharding (Options) Based on UserID (Not recommended) Based on MediaID Generate unique MediaIDs first and then find a shard number through MediaID % 10 servers Generate MediaIDs Dedicate a separate database instance to generate auto-incrementing IDs Define a table containing only an ID field As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media Single PoF?">
+<meta property="og:url" content="/notes/system-design/design/short-media-sharing-platform/">
+<meta property="og:site_name" content="iliyaML">
+
+  
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="">
+<meta name="twitter:creator" content="">
+<meta name="twitter:title" content="Short Media Sharing Platform">
+<meta name="twitter:description" content="">
+<meta name="twitter:card" content="summary">
+    <meta name="twitter:image:alt" content="Short Media Sharing Platform">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+        "@id": "/#/schema/person/1",
+      "name": "",
+      "url": "/",
+      "sameAs": [
+        ],
+      "image": {
+          "@type": "ImageObject",
+          "@id": "/#/schema/image/1",
+          "url": "/\u003cnil\u003e",
+          "width":  null ,
+          "height":  null ,
+          "caption": ""
+        }
+      },
+    {
+      "@type": "WebSite",
+      "@id": "/#/schema/website/1",
+      "url": "/",
+      "name": "iliyaML",
+      "description": "Hi, I’m Iliya 👋",
+      "publisher": {
+          "@id": "/#/schema/person/1"
+        }
+      },
+    {
+      "@type": "WebPage",
+      "@id": "/notes/system-design/design/short-media-sharing-platform/",
+      "url": "/notes/system-design/design/short-media-sharing-platform/",
+      "name": "Short Media Sharing Platform",
+      "description": "",
+      "isPartOf": {
+        "@id": "/#/schema/website/1"
+      },
+      "about": {
+          "@id": "/#/schema/person/1"
+        },
+      "datePublished": "0001-01-01T00:00:00CET",
+      "dateModified": "0001-01-01T00:00:00CET",
+      "breadcrumb": {
+        "@id": "/notes/system-design/design/short-media-sharing-platform/#/schema/breadcrumb/1"
+      },
+      "primaryImageOfPage": {
+        "@id": "/notes/system-design/design/short-media-sharing-platform/#/schema/image/2"
+      },
+      "inLanguage": "",
+      "potentialAction": [{
+        "@type": "ReadAction", "target": ["/notes/system-design/design/short-media-sharing-platform/"]
+      }]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "/notes/system-design/design/short-media-sharing-platform/#/schema/breadcrumb/1",
+      "name": "Breadcrumbs",
+      "itemListElement": [{
+        "@type": "ListItem",
+        "position":  1 ,
+        "item": {
+          "@type": "WebPage",
+          "@id": "/",
+          "url": "/",
+          "name": "Home"
+          }
+        },{
+        "@type": "ListItem",
+        "position":  2 ,
+        "item": {
+          "@id": "/notessystem-designdesignshort-media-sharing-platform/"
+          }
+        }]
+    },
+
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ImageObject",
+          "@id": "/notes/system-design/design/short-media-sharing-platform/#/schema/image/2",
+          "url":  null ,
+          "contentUrl":  null ,
+          "caption": "Short Media Sharing Platform"
+        }
+      ]
+    }
+
+  ]
+}
+</script>
+
+  <meta name="theme-color" content="#fff">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" crossorigin="use-credentials" href="/site.webmanifest">
+
+  
+
+</head>
+
+  <body class="notes single">
+    <div class="sticky-top">
+<div class="header-bar"></div>
+
+<header class="navbar navbar-expand-lg navbar-light doks-navbar">
+  <nav class="container-xxl flex-wrap flex-lg-nowrap" aria-label="Main navigation">
+
+    <a class="navbar-brand order-0" href="/" aria-label="iliyaML">
+      iliyaML
+    </a>
+
+    <button class="btn btn-link order-0 ms-auto d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExample" aria-controls="offcanvasExample">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-horizontal"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+    </button>
+    <div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
+      <div class="header-bar"></div>
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasExampleLabel">Browse notes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <aside class="doks-sidebar mt-n3">
+          <nav id="doks-docs-nav" aria-label="Tertiary navigation">
+            
+<ul class="list-unstyled collapsible-sidebar">
+  
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-091fa9121c047db1dd48c3e2ab5f3c91" aria-expanded="false">
+          Machine Learning
+        </button>
+        <div class="collapse" id="section-091fa9121c047db1dd48c3e2ab5f3c91">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/k-nearest-neighbors/">K-Nearest Neighbors (KNN)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/linear-regression/">Linear Regression</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/logistic-regression/">Logistic Regression</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-6a68b6412b3d8a605c374d3c59e02694" aria-expanded="false">
+          Deep Learning
+        </button>
+        <div class="collapse" id="section-6a68b6412b3d8a605c374d3c59e02694">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/deep-learning/neural-networks/">Neural Networks</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-85587c49afa2ea2adacd4bbcdb57d064" aria-expanded="false">
+          NLP
+        </button>
+        <div class="collapse" id="section-85587c49afa2ea2adacd4bbcdb57d064">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/papers/">Papers</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/attention-is-all-you-need/">Attention is All You Need (2017)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/state-of-gpt-2023/">State of GPT (2023)</a></li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-2828d5a2b445bfbe4d992368391c42e2" aria-expanded="false">
+                    Generative AI with Large Language Models
+                  </button>
+                  <div class="collapse" id="section-2828d5a2b445bfbe4d992368391c42e2">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-1/">Week 1 Part 1 - Introduction to LLMs and the Generative AI Project Lifecycle</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/transformers-architecture/">Week 1 Part 1 - Transformers Architecture</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-2/">Week 1 Part 2 - Pre-training and Scaling Laws</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-1/">Week 2 Part 1 - Fine-tuning LLMs with Instruction</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-2/">Week 2 Part 2 - Parameter Efficient Fine-Tuning</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-c33e404a441c6ba9648f88af3c68a1ca" aria-expanded="false">
+          Statistics
+        </button>
+        <div class="collapse" id="section-c33e404a441c6ba9648f88af3c68a1ca">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/statistics/introduction/">Introduction</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-89320dbd4e0a792bc1676fde2d5bccfc" aria-expanded="false">
+          DSA
+        </button>
+        <div class="collapse" id="section-89320dbd4e0a792bc1676fde2d5bccfc">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/dsa/data-structures-and-algorithms/">Data Structures &amp; Algorithms</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-98bf5c1a28c1981bf8d74d4bc73ceaab" aria-expanded="true">
+          System Design
+        </button>
+        <div class="collapse show" id="section-98bf5c1a28c1981bf8d74d4bc73ceaab">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-0460583622f03a52d7693094d6fa2452" aria-expanded="false">
+                    Concepts
+                  </button>
+                  <div class="collapse" id="section-0460583622f03a52d7693094d6fa2452">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/basics/">Basics</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/20-concepts/">20 Concepts</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/25-golden-rules/">25 Golden Rules</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/key-steps/">Key Steps</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-1afa74da05ca145d3418aad9af510109" aria-expanded="true">
+                    Design
+                  </button>
+                  <div class="collapse show" id="section-1afa74da05ca145d3418aad9af510109">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/url-shortener/">URL Shortener</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded active" href="/notes/system-design/design/short-media-sharing-platform/">Short Media Sharing Platform</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/video-streaming-platform/">Video Streaming Platform</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+  
+</ul>
+
+          </nav>
+        </aside>
+      </div>
+    </div>
+    <button class="btn btn-menu order-2 d-block d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasDoks" aria-controls="offcanvasDoks" aria-label="Open main menu">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+    <div class="offcanvas offcanvas-end border-0 py-lg-1" tabindex="-1" id="offcanvasDoks" data-bs-backdrop="true" aria-labelledby="offcanvasDoksLabel">
+      <div class="header-bar d-lg-none"></div>
+      <div class="offcanvas-header d-lg-none">
+        <h2 class="h5 offcanvas-title ps-2" id="offcanvasDoksLabel"><a class="text-dark" href="/">iliyaML</a></h2>
+        <button type="button" class="btn-close text-reset me-2" data-bs-dismiss="offcanvas" aria-label="Close main menu"></button>
+      </div>
+      <div class="offcanvas-body p-4 p-lg-0">
+        <ul class="nav flex-column flex-lg-row align-items-lg-center mt-2 mt-lg-0 ms-lg-2 me-lg-auto">
+              <li class="nav-item">
+                <a class="nav-link ps-0 py-1" href="/about/">About</a>
+              </li>
+            
+          
+              <li class="nav-item">
+                <a class="nav-link ps-0 py-1 active" href="/notes/machine-learning/k-nearest-neighbors">Notes</a>
+              </li>
+            
+          </ul>
+
+        <hr class="text-black-50 my-4 d-lg-none">
+        <form class="doks-search position-relative flex-grow-1 ms-lg-auto me-lg-2">
+          <input id="search" class="form-control is-search" type="search" placeholder="Search..." aria-label="Search..." autocomplete="off">
+          <div id="suggestions" class="shadow bg-white rounded d-none"></div>
+        </form>
+        <hr class="text-black-50 my-4 d-lg-none">
+        <ul class="nav flex-column flex-lg-row">
+          <li class="nav-item">
+              <a class="nav-link social-link" href="https://github.com/iliyaML"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-github"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg><small class="ms-2 d-lg-none">GitHub</small></a>
+            </li>
+          <li class="nav-item">
+              <a class="nav-link social-link" href="https://www.linkedin.com/in/iliya-mohamad-lokman"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-linkedin"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg><small class="ms-2 d-lg-none">LinkedIn</small></a>
+            </li>
+          </ul>
+
+        <hr class="text-black-50 my-4 d-lg-none">
+        <button id="mode" class="btn btn-link" type="button" aria-label="Toggle user interface mode">
+          <span class="toggle-dark"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+          <span class="toggle-light"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-sun"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+        </button>
+        </div>
+    </div>
+  </nav>
+</header>
+
+
+</div>
+
+
+<div class="container-xxl">
+  <aside class="doks-sidebar">
+    <nav id="doks-docs-nav" class="collapse d-lg-none" aria-label="Tertiary navigation">
+      
+<ul class="list-unstyled collapsible-sidebar">
+  
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-091fa9121c047db1dd48c3e2ab5f3c91" aria-expanded="false">
+          Machine Learning
+        </button>
+        <div class="collapse" id="section-091fa9121c047db1dd48c3e2ab5f3c91">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/k-nearest-neighbors/">K-Nearest Neighbors (KNN)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/linear-regression/">Linear Regression</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/logistic-regression/">Logistic Regression</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-6a68b6412b3d8a605c374d3c59e02694" aria-expanded="false">
+          Deep Learning
+        </button>
+        <div class="collapse" id="section-6a68b6412b3d8a605c374d3c59e02694">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/deep-learning/neural-networks/">Neural Networks</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-85587c49afa2ea2adacd4bbcdb57d064" aria-expanded="false">
+          NLP
+        </button>
+        <div class="collapse" id="section-85587c49afa2ea2adacd4bbcdb57d064">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/papers/">Papers</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/attention-is-all-you-need/">Attention is All You Need (2017)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/state-of-gpt-2023/">State of GPT (2023)</a></li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-2828d5a2b445bfbe4d992368391c42e2" aria-expanded="false">
+                    Generative AI with Large Language Models
+                  </button>
+                  <div class="collapse" id="section-2828d5a2b445bfbe4d992368391c42e2">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-1/">Week 1 Part 1 - Introduction to LLMs and the Generative AI Project Lifecycle</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/transformers-architecture/">Week 1 Part 1 - Transformers Architecture</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-2/">Week 1 Part 2 - Pre-training and Scaling Laws</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-1/">Week 2 Part 1 - Fine-tuning LLMs with Instruction</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-2/">Week 2 Part 2 - Parameter Efficient Fine-Tuning</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-c33e404a441c6ba9648f88af3c68a1ca" aria-expanded="false">
+          Statistics
+        </button>
+        <div class="collapse" id="section-c33e404a441c6ba9648f88af3c68a1ca">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/statistics/introduction/">Introduction</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-89320dbd4e0a792bc1676fde2d5bccfc" aria-expanded="false">
+          DSA
+        </button>
+        <div class="collapse" id="section-89320dbd4e0a792bc1676fde2d5bccfc">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/dsa/data-structures-and-algorithms/">Data Structures &amp; Algorithms</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-98bf5c1a28c1981bf8d74d4bc73ceaab" aria-expanded="true">
+          System Design
+        </button>
+        <div class="collapse show" id="section-98bf5c1a28c1981bf8d74d4bc73ceaab">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-0460583622f03a52d7693094d6fa2452" aria-expanded="false">
+                    Concepts
+                  </button>
+                  <div class="collapse" id="section-0460583622f03a52d7693094d6fa2452">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/basics/">Basics</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/20-concepts/">20 Concepts</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/25-golden-rules/">25 Golden Rules</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/key-steps/">Key Steps</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-1afa74da05ca145d3418aad9af510109" aria-expanded="true">
+                    Design
+                  </button>
+                  <div class="collapse show" id="section-1afa74da05ca145d3418aad9af510109">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/url-shortener/">URL Shortener</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded active" href="/notes/system-design/design/short-media-sharing-platform/">Short Media Sharing Platform</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/video-streaming-platform/">Video Streaming Platform</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+  
+</ul>
+
+    </nav>
+  </aside>
+</div>
+
+    <div class="wrap container-xxl" role="document">
+      <div class="content">
+        
+	<div class="row flex-xl-nowrap">
+		<div class="col-lg-5 col-xl-4 docs-sidebar d-none d-lg-block">
+			<nav class="docs-links" aria-label="Main navigation">
+				
+<ul class="list-unstyled collapsible-sidebar">
+  
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-091fa9121c047db1dd48c3e2ab5f3c91" aria-expanded="false">
+          Machine Learning
+        </button>
+        <div class="collapse" id="section-091fa9121c047db1dd48c3e2ab5f3c91">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/k-nearest-neighbors/">K-Nearest Neighbors (KNN)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/linear-regression/">Linear Regression</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/machine-learning/logistic-regression/">Logistic Regression</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-6a68b6412b3d8a605c374d3c59e02694" aria-expanded="false">
+          Deep Learning
+        </button>
+        <div class="collapse" id="section-6a68b6412b3d8a605c374d3c59e02694">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/deep-learning/neural-networks/">Neural Networks</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-85587c49afa2ea2adacd4bbcdb57d064" aria-expanded="false">
+          NLP
+        </button>
+        <div class="collapse" id="section-85587c49afa2ea2adacd4bbcdb57d064">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/papers/">Papers</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/attention-is-all-you-need/">Attention is All You Need (2017)</a></li>
+              
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/nlp/state-of-gpt-2023/">State of GPT (2023)</a></li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-2828d5a2b445bfbe4d992368391c42e2" aria-expanded="false">
+                    Generative AI with Large Language Models
+                  </button>
+                  <div class="collapse" id="section-2828d5a2b445bfbe4d992368391c42e2">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-1/">Week 1 Part 1 - Introduction to LLMs and the Generative AI Project Lifecycle</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/transformers-architecture/">Week 1 Part 1 - Transformers Architecture</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-1-part-2/">Week 1 Part 2 - Pre-training and Scaling Laws</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-1/">Week 2 Part 1 - Fine-tuning LLMs with Instruction</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/nlp/generative-ai-with-llms/week-2-part-2/">Week 2 Part 2 - Parameter Efficient Fine-Tuning</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-c33e404a441c6ba9648f88af3c68a1ca" aria-expanded="false">
+          Statistics
+        </button>
+        <div class="collapse" id="section-c33e404a441c6ba9648f88af3c68a1ca">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/statistics/introduction/">Introduction</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-89320dbd4e0a792bc1676fde2d5bccfc" aria-expanded="false">
+          DSA
+        </button>
+        <div class="collapse" id="section-89320dbd4e0a792bc1676fde2d5bccfc">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li><a class="docs-link rounded" href="/notes/dsa/data-structures-and-algorithms/">Data Structures &amp; Algorithms</a></li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+      
+      <li class="mb-1">
+        <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-98bf5c1a28c1981bf8d74d4bc73ceaab" aria-expanded="true">
+          System Design
+        </button>
+        <div class="collapse show" id="section-98bf5c1a28c1981bf8d74d4bc73ceaab">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-0460583622f03a52d7693094d6fa2452" aria-expanded="false">
+                    Concepts
+                  </button>
+                  <div class="collapse" id="section-0460583622f03a52d7693094d6fa2452">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/basics/">Basics</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/20-concepts/">20 Concepts</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/25-golden-rules/">25 Golden Rules</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/concepts/key-steps/">Key Steps</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+              
+                
+                <li class="my-1 ms-3">
+                  <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#section-1afa74da05ca145d3418aad9af510109" aria-expanded="true">
+                    Design
+                  </button>
+                  <div class="collapse show" id="section-1afa74da05ca145d3418aad9af510109">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/url-shortener/">URL Shortener</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded active" href="/notes/system-design/design/short-media-sharing-platform/">Short Media Sharing Platform</a></li>
+                        
+                      
+                        
+                          
+                          <li><a class="docs-link rounded" href="/notes/system-design/design/video-streaming-platform/">Video Streaming Platform</a></li>
+                        
+                      
+                    </ul>
+                  </div>
+                </li>
+              
+            
+          </ul>
+        </div>
+      </li>
+    
+  
+</ul>
+
+			</nav>
+		</div>
+		<nav class="docs-toc d-none d-xl-block col-xl-3" aria-label="Secondary navigation">
+			<div class="d-xl-none">
+  <button class="btn btn-outline-primary btn-sm doks-toc-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#onThisPage" aria-controls="doks-docs-nav" aria-expanded="false" aria-label="Toggle On this page navigation">
+    <span>On this page</span>
+    <span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-expand" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Expand</title><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-collapse" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Collapse</title><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
+    </span>
+  </button>
+  <div class="collapse" id="onThisPage">
+    <div class="card card-body mt-3 py-1">
+      <div class="page-links">
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#system-requirements--goals">System Requirements / Goals</a></li>
+    <li><a href="#capacity-estimation--constraints">Capacity Estimation / Constraints</a></li>
+    <li><a href="#high-level-system-design">High Level System Design</a></li>
+    <li><a href="#database-schema">Database Schema</a></li>
+    <li><a href="#component-design">Component Design</a></li>
+    <li><a href="#reliability-and-redundancy">Reliability and Redundancy</a></li>
+    <li><a href="#data-sharding">Data Sharding</a></li>
+    <li><a href="#cache-and-load-balancing">Cache and Load Balancing</a></li>
+  </ul>
+</nav>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page-links d-none d-xl-block">
+  <h3>On this page</h3>
+  <nav id="TableOfContents">
+  <ul>
+    <li><a href="#system-requirements--goals">System Requirements / Goals</a></li>
+    <li><a href="#capacity-estimation--constraints">Capacity Estimation / Constraints</a></li>
+    <li><a href="#high-level-system-design">High Level System Design</a></li>
+    <li><a href="#database-schema">Database Schema</a></li>
+    <li><a href="#component-design">Component Design</a></li>
+    <li><a href="#reliability-and-redundancy">Reliability and Redundancy</a></li>
+    <li><a href="#data-sharding">Data Sharding</a></li>
+    <li><a href="#cache-and-load-balancing">Cache and Load Balancing</a></li>
+  </ul>
+</nav>
+  </div>
+
+		</nav>
+		<main class="docs-content col-lg-11 col-xl-9 mx-xl-auto">
+		
+			<h1>Short Media Sharing Platform</h1>
+			<p class="lead"></p>
+			<nav class="d-xl-none" aria-label="Quaternary navigation">
+				<div class="d-xl-none">
+  <button class="btn btn-outline-primary btn-sm doks-toc-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#onThisPage" aria-controls="doks-docs-nav" aria-expanded="false" aria-label="Toggle On this page navigation">
+    <span>On this page</span>
+    <span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-expand" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Expand</title><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="doks doks-collapse" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Collapse</title><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
+    </span>
+  </button>
+  <div class="collapse" id="onThisPage">
+    <div class="card card-body mt-3 py-1">
+      <div class="page-links">
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#system-requirements--goals">System Requirements / Goals</a></li>
+    <li><a href="#capacity-estimation--constraints">Capacity Estimation / Constraints</a></li>
+    <li><a href="#high-level-system-design">High Level System Design</a></li>
+    <li><a href="#database-schema">Database Schema</a></li>
+    <li><a href="#component-design">Component Design</a></li>
+    <li><a href="#reliability-and-redundancy">Reliability and Redundancy</a></li>
+    <li><a href="#data-sharding">Data Sharding</a></li>
+    <li><a href="#cache-and-load-balancing">Cache and Load Balancing</a></li>
+  </ul>
+</nav>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page-links d-none d-xl-block">
+  <h3>On this page</h3>
+  <nav id="TableOfContents">
+  <ul>
+    <li><a href="#system-requirements--goals">System Requirements / Goals</a></li>
+    <li><a href="#capacity-estimation--constraints">Capacity Estimation / Constraints</a></li>
+    <li><a href="#high-level-system-design">High Level System Design</a></li>
+    <li><a href="#database-schema">Database Schema</a></li>
+    <li><a href="#component-design">Component Design</a></li>
+    <li><a href="#reliability-and-redundancy">Reliability and Redundancy</a></li>
+    <li><a href="#data-sharding">Data Sharding</a></li>
+    <li><a href="#cache-and-load-balancing">Cache and Load Balancing</a></li>
+  </ul>
+</nav>
+  </div>
+
+			</nav>
+			<p>Notes from <a href="https://www.educative.io/">grokking system design</a></p>
+<p>Services: Instagram, TikTok</p>
+<h2 id="system-requirements--goals">System Requirements / Goals <a href="#system-requirements--goals" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>Functional Requirements
+<ul>
+<li>Upload, download, view photos and short videos</li>
+<li>Video or photo metadata search</li>
+<li>Able to follow other users</li>
+</ul>
+</li>
+<li>Non-functional Requirements
+<ul>
+<li>High availability
+<ul>
+<li>Consistency can take a hit (in the interest of availability), if a user doesn’t see a photo/video for a while, still fine</li>
+</ul>
+</li>
+<li>High reliability (media is never lost)</li>
+<li>Acceptable latency (loading media)</li>
+</ul>
+</li>
+</ul>
+<h2 id="capacity-estimation--constraints">Capacity Estimation / Constraints <a href="#capacity-estimation--constraints" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>Read-heavy system</li>
+<li>Users
+<ul>
+<li>Total Users: 500 M</li>
+<li><code>Daily Active Users (DAU): 1 M</code></li>
+</ul>
+</li>
+<li>Storage
+<ul>
+<li>For 1 Day: <code>2 M Uploaded Media * 200 KB average file size = 400 GB / day</code></li>
+<li>For 10 years: <code>400 GB / day * 365 days * 10 years = ~1425 TB</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="high-level-system-design">High Level System Design <a href="#high-level-system-design" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>(Write) Upload media service</li>
+<li>(Read) View/Search media service</li>
+<li>Object storage servers - store media</li>
+<li>Database servers - store media metadata and users metadata</li>
+</ul>
+<h2 id="database-schema">Database Schema <a href="#database-schema" class="anchor" aria-hidden="true">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Media</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MediaID</td>
+<td>int PK</td>
+</tr>
+<tr>
+<td>MediaPath</td>
+<td>varchar</td>
+</tr>
+<tr>
+<td>CreationDate</td>
+<td>datetime</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UserID</td>
+<td>int PK</td>
+</tr>
+<tr>
+<td>Name</td>
+<td>varchar</td>
+</tr>
+<tr>
+<td>Email</td>
+<td>varchar</td>
+</tr>
+<tr>
+<td>DateOfBirth</td>
+<td>datetime</td>
+</tr>
+<tr>
+<td>CreationDate</td>
+<td>datetime</td>
+</tr>
+<tr>
+<td>LastLogin</td>
+<td>datetime</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>UserFollow</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UserID1</td>
+<td>int PK</td>
+</tr>
+<tr>
+<td>UserID2</td>
+<td>int PK</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Relational Database
+<ul>
+<li>Require joins</li>
+<li>Challenge to scale the application</li>
+</ul>
+</li>
+<li>NoSQL Database
+<ul>
+<li>Distributed key-value store</li>
+<li>Schema
+<ul>
+<li>Media</li>
+<li>User</li>
+<li>UserFollow</li>
+</ul>
+</li>
+<li>Apache Cassandra
+<ul>
+<li>Maintain replicas for high reliability</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Media Data Store
+<ul>
+<li>Distributed File Storage (HDFS)</li>
+<li>Distributed Object Storage (Amazon S3)</li>
+</ul>
+</li>
+</ul>
+<h2 id="component-design">Component Design <a href="#component-design" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>Split reads and writes to separate servers, avoid overload, scale independently (Microservices)
+<ul>
+<li>Web servers have a connection limit (Assume 500, therefore can’t have more concurrent reads/writes more than this)
+<ul>
+<li>(Write) Upload media service
+<ul>
+<li>Slow, reads from disk</li>
+</ul>
+</li>
+<li>(Read) View media service
+<ul>
+<li>Faster, especially served from cache</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="reliability-and-redundancy">Reliability and Redundancy <a href="#reliability-and-redundancy" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>High Availability and Reliability - Store multiple copies of media</li>
+<li>Multiple copies of the services, system will run even if one instance of a service dies</li>
+<li>Eliminate single PoF</li>
+</ul>
+<h2 id="data-sharding">Data Sharding <a href="#data-sharding" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>Metadata Sharding (Options)
+<ol>
+<li>Based on UserID (Not recommended)</li>
+<li>Based on MediaID
+<ol>
+<li>Generate unique MediaIDs first and then find a shard number through Media<code>ID % 10 servers</code></li>
+</ol>
+</li>
+</ol>
+</li>
+<li>Generate MediaIDs
+<ul>
+<li>Dedicate a separate database instance to generate auto-incrementing IDs</li>
+<li>Define a table containing only an ID field</li>
+<li>As new media added into the system, insert a new row in this table and take that ID to be our MediaID of the new media</li>
+<li>Single PoF?
+<ul>
+<li>Two DB instance, one generating even numbers, one generating odd numbers</li>
+<li>Design can be extended for Users, Media-Comments</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="cache-and-load-balancing">Cache and Load Balancing <a href="#cache-and-load-balancing" class="anchor" aria-hidden="true">#</a></h2>
+<ul>
+<li>Need large-scale media delivery system (Global)</li>
+<li>Pareto Principle: 80-20 rule
+<ul>
+<li>20% of daily read volume for media is generating 80% of traffic</li>
+<li>Cache 20% of media files and metadata</li>
+</ul>
+</li>
+<li>CDN for static assets
+<ul>
+<li>Geographically distributed cache servers</li>
+<li>Push content closer to the user</li>
+</ul>
+</li>
+<li>Cache for Metadata
+<ul>
+<li>Cache hot database rows</li>
+<li>Memcached</li>
+<li>Application servers check cache first before hitting DB</li>
+<li>Cache Eviction Policy: LRU</li>
+</ul>
+</li>
+</ul>
+
+			<div class="page-footer-meta d-flex flex-column flex-md-row justify-content-between">
+				</div>
+			<div class="docs-navigation d-flex justify-content-between">
+	
+	<a href="/notes/system-design/design/url-shortener/">
+			<div class="card my-1">
+				<div class="card-body py-2">
+					&larr; URL Shortener
+				</div>
+			</div>
+		</a>
+	<a class="ms-auto" href="/notes/system-design/design/video-streaming-platform/">
+			<div class="card my-1">
+				<div class="card-body py-2">
+					Video Streaming Platform &rarr;
+				</div>
+			</div>
+		</a>
+	</div>
+
+			
+		</main>
+	</div>
+
+      </div>
+    </div>
+    
+    
+    
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-X0X8EQ5BBE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-X0X8EQ5BBE');
+</script>
+
+<footer class="footer text-muted">
+  <div class="container-xxl">
+    <div class="row">
+      <div class="col-lg-8 order-last order-lg-first">
+        <ul class="list-inline">
+          <li class="list-inline-item">© 2023 <a class="text-muted" href="/">iliyaML</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-8 order-first order-lg-last text-lg-end">
+        <ul class="list-inline">
+          </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+    
+
+<script src="/js/bootstrap.min.32716f82c36f56469a1d738e1145687e0dd2c609b16c838d079ee4a441658cfa897ba465f51a85b2593709fc61b3a1481ea1d3484bf03659ad0c528e733e3df1.js" integrity="sha512-MnFvgsNvVkaaHXOOEUVofg3SxgmxbIONB57kpEFljPqJe6Rl9RqFslk3Cfxhs6FIHqHTSEvwNlmtDFKOcz498Q==" crossorigin="anonymous" defer></script>
+  <script src="/js/highlight.min.51305fbad2c264cfad2dc87b1fd1537c74913dc9567a69d42535089d677099cb5be05814e68f3c8ddba219f1dc9ea53233e6f8c3d2a1dd1b7f316bea4a2ddb19.js" integrity="sha512-UTBfutLCZM&#43;tLch7H9FTfHSRPclWemnUJTUInWdwmctb4FgU5o88jduiGfHcnqUyM&#43;b4w9Kh3Rt/MWvqSi3bGQ==" crossorigin="anonymous" defer></script>
+  <script src="/main.min.f7deb8c0146c4984d4c6606f3aa50cbedd9a4971789bc6b4453c74fa82166072d8d10407ae4cd8282237a5eeb299527e9dbd1ea8f479ebc839a705fcb1f3882a.js" integrity="sha512-9964wBRsSYTUxmBvOqUMvt2aSXF4m8a0RTx0&#43;oIWYHLY0QQHrkzYKCI3pe6ymVJ&#43;nb0eqPR568g5pwX8sfOIKg==" crossorigin="anonymous" defer></script>
+  <script src="/index.min.7db3cffa0a2800259ac786ff927ac8987f7acae83daa4d16260810a2a48a46abf630f65d02c7b2965c716a32a63df5434a58cbdb4a05b7ef23854f4f813eb88e.js" integrity="sha512-fbPP&#43;gooACWax4b/knrImH96yug9qk0WJggQoqSKRqv2MPZdAseyllxxajKmPfVDSljL20oFt&#43;8jhU9PgT64jg==" crossorigin="anonymous" defer></script>
+  
+    
+  </body>
+</html>

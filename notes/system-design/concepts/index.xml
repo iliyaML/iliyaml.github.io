@@ -1,8 +1,51 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Concepts on</title><link>/notes/system-design/concepts/</link><description>Recent content in Concepts on</description><generator>Hugo -- gohugo.io</generator><lastBuildDate>Tue, 06 Oct 2020 08:49:15 +0000</lastBuildDate><atom:link href="/notes/system-design/concepts/index.xml" rel="self" type="application/rss+xml"/><item><title>Basics</title><link>/notes/system-design/concepts/basics/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notes/system-design/concepts/basics/</guid><description>“Everything is a trade-off” #
-Distributed System → a network of computers that work together to perform task(s) Characteristics of a Distributed System Availability → % uptime (ex: 99.99%) Reliability → remain operational despite component(s) failure, implies Availability Both achieved by Replication of data and Redundancy of services Scalability / Scaling → cope with increased demand without drop in performance Vertical Scaling - get a bigger machine, increase CPU, RAM, Storage, etc.</description></item><item><title>20 Concepts</title><link>/notes/system-design/concepts/20-concepts/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notes/system-design/concepts/20-concepts/</guid><description>Notes from 20 System Design Concepts Explained in 10 Minutes
-Vertical Scaling → Add more resources like RAM or CPU Horizontal Scaling → Add replicas; each server can handle a subset of requests; can almost scale infinitely; don’t need beefy machines; adds redundancy and fault tolerance; eliminates single POF Load Balancer → a server known as Reverse Proxy; redirects incoming requests to the appropriate server; Round Robin (cycle through our pool of servers); Hashing incoming request ID; goal is to even the amount of traffic each server is getting; if servers are located all around the world, can route a request to the nearest location Content Delivery Networks → serving static files (images/videos/HTML/CSS/JS); network of servers located all around the world; does not run any application logic; work by taking files from the origin server and copying them into CDN servers; an either be pull or push basis; a technique for caching Caching → creating copies of data so that it can be refetched faster in the future; making network requests can be expensive, so our browsers sometimes cache data onto our disk, reading from disk can be expensive, so computer copies it into memory, but reading from memory can be expensive, so operating system will copy a subset of it into L1, L2 or L3 CPU cache IP Address → every computer assigned an IP address which uniquely identifies a device on a network TCP / IP → the Internet Protocol Suite, includes IP, TCP and UDP, TCP: files are broken down into individual packets and sent over the Internet, arrive at the destination, packets are numbered so they can be reassembled in the right order; if packets are missing, TCP ensures they will be resent as TCP is a reliable protocol; HTTP and WebSockets are built on top of TCP Domain Name System (DNS) → largely decentralized service that works to translate a domain to its IP address; when you buy a domain from a DNS registrar, you can create a DNA A record (stands for address), and then you can the enter the IP address of your server, so when you search and your computer makes a DNS query to get the IP address, it’ll use the A record mapping to get the address and then your operating system will cache it so that it does not need to make a DNS query every single time HTTP → use this protocol to view websites as TCP is too low level; it is an application layer protocol; client-server model, client initiates a request (includes 1.</description></item><item><title>25 Golden Rules</title><link>/notes/system-design/concepts/25-golden-rules/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notes/system-design/concepts/25-golden-rules/</guid><description>Notes from 25 Golden Rules for System Design Interview
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Concepts on </title>
+    <link>/notes/system-design/concepts/</link>
+    <description>Recent content in Concepts on </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 06 Oct 2020 08:49:15 +0000</lastBuildDate><atom:link href="/notes/system-design/concepts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Basics</title>
+      <link>/notes/system-design/concepts/basics/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/notes/system-design/concepts/basics/</guid>
+      <description>“Everything is a trade-off” #Distributed System → a network of computers that work together to perform task(s) Characteristics of a Distributed System Availability → % uptime (ex: 99.99%) Reliability → remain operational despite component(s) failure, implies Availability Both achieved by Replication of data and Redundancy of services Scalability / Scaling → cope with increased demand without drop in performance Vertical Scaling - get a bigger machine, increase CPU, RAM, Storage, etc.</description>
+    </item>
+    
+    <item>
+      <title>20 Concepts</title>
+      <link>/notes/system-design/concepts/20-concepts/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/notes/system-design/concepts/20-concepts/</guid>
+      <description>Notes from 20 System Design Concepts Explained in 10 Minutes
+Vertical Scaling → Add more resources like RAM or CPU Horizontal Scaling → Add replicas; each server can handle a subset of requests; can almost scale infinitely; don’t need beefy machines; adds redundancy and fault tolerance; eliminates single POF Load Balancer → a server known as Reverse Proxy; redirects incoming requests to the appropriate server; Round Robin (cycle through our pool of servers); Hashing incoming request ID; goal is to even the amount of traffic each server is getting; if servers are located all around the world, can route a request to the nearest location Content Delivery Networks → serving static files (images/videos/HTML/CSS/JS); network of servers located all around the world; does not run any application logic; work by taking files from the origin server and copying them into CDN servers; an either be pull or push basis; a technique for caching Caching → creating copies of data so that it can be refetched faster in the future; making network requests can be expensive, so our browsers sometimes cache data onto our disk, reading from disk can be expensive, so computer copies it into memory, but reading from memory can be expensive, so operating system will copy a subset of it into L1, L2 or L3 CPU cache IP Address → every computer assigned an IP address which uniquely identifies a device on a network TCP / IP → the Internet Protocol Suite, includes IP, TCP and UDP, TCP: files are broken down into individual packets and sent over the Internet, arrive at the destination, packets are numbered so they can be reassembled in the right order; if packets are missing, TCP ensures they will be resent as TCP is a reliable protocol; HTTP and WebSockets are built on top of TCP Domain Name System (DNS) → largely decentralized service that works to translate a domain to its IP address; when you buy a domain from a DNS registrar, you can create a DNA A record (stands for address), and then you can the enter the IP address of your server, so when you search and your computer makes a DNS query to get the IP address, it’ll use the A record mapping to get the address and then your operating system will cache it so that it does not need to make a DNS query every single time HTTP → use this protocol to view websites as TCP is too low level; it is an application layer protocol; client-server model, client initiates a request (includes 1.</description>
+    </item>
+    
+    <item>
+      <title>25 Golden Rules</title>
+      <link>/notes/system-design/concepts/25-golden-rules/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/notes/system-design/concepts/25-golden-rules/</guid>
+      <description>Notes from 25 Golden Rules for System Design Interview
 If we are dealing with a read-heavy system, it&amp;rsquo;s good to consider using a Cache
 If we need low latency in the system, it&amp;rsquo;s good to consider using a Cache &amp;amp; CDN
 If we are dealing with a write-heavy system, it&amp;rsquo;s good to use a Message Queue for Async processing
-If we need a system to be ACID complaint, we should go for RDBMS or SQL Database</description></item><item><title>Key Steps</title><link>/notes/system-design/concepts/key-steps/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notes/system-design/concepts/key-steps/</guid><description>Steps #
-Requirements / Clarifications / Minimum Viable Product (MVP) / Goals Functional Requirements Basic functionalities of the app Non-functional Requirements Availability, Consistency, Latency, Scalability… High Availability, High Reliability, Low Latency, Highly Scalable Can consistency take a hit in favor of availability/lower latency? Low latency in … Extended Requirements (recommended if you have more time) Estimation and Constraints / Back of the Envelope Calculation / Rough Estimates Read heavy? Write Heavy?</description></item></channel></rss>
+If we need a system to be ACID complaint, we should go for RDBMS or SQL Database</description>
+    </item>
+    
+    <item>
+      <title>Key Steps</title>
+      <link>/notes/system-design/concepts/key-steps/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/notes/system-design/concepts/key-steps/</guid>
+      <description>Steps #Requirements / Clarifications / Minimum Viable Product (MVP) / Goals Functional Requirements Basic functionalities of the app Non-functional Requirements Availability, Consistency, Latency, Scalability… High Availability, High Reliability, Low Latency, Highly Scalable Can consistency take a hit in favor of availability/lower latency? Low latency in … Extended Requirements (recommended if you have more time) Estimation and Constraints / Back of the Envelope Calculation / Rough Estimates Read heavy? Write Heavy?</description>
+    </item>
+    
+  </channel>
+</rss>

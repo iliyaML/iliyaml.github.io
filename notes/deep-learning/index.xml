@@ -1,1 +1,19 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Deep Learning on</title><link>/notes/deep-learning/</link><description>Recent content in Deep Learning on</description><generator>Hugo -- gohugo.io</generator><lastBuildDate>Tue, 06 Oct 2020 08:49:15 +0000</lastBuildDate><atom:link href="/notes/deep-learning/index.xml" rel="self" type="application/rss+xml"/><item><title>Neural Networks</title><link>/notes/deep-learning/neural-networks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notes/deep-learning/neural-networks/</guid><description> A supervised learning algorithm that can be used for regression and classification problems Non-linear model Components Neurons Input Layer Hidden Layer(s) Output Layer Optimizer Function Adam (Adaptive Moment Estimation) Non-linear Activation Functions ReLU, Sigmoid, TanH Softmax - often used in the output layer for multiclass classification Regularization: dropout Loss Function MSE Binary Cross Entropy (Log Loss) Categorical Cross Entropy Forward Propagation: making inference Backward Propagation (Chain Rule): computes derivatives of your cost function with respect to the parameters Pros Cons Can be used for both regression and classification problems Black box Able to solve linearly inseparable problem Require significant amount of data Computationally expensive to train Approaches Gradient Descent Batch Gradient Descent Stochastic Gradient Descent Mini-Batch Gradient Descent</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Deep Learning on </title>
+    <link>/notes/deep-learning/</link>
+    <description>Recent content in Deep Learning on </description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 06 Oct 2020 08:49:15 +0000</lastBuildDate><atom:link href="/notes/deep-learning/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Neural Networks</title>
+      <link>/notes/deep-learning/neural-networks/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/notes/deep-learning/neural-networks/</guid>
+      <description> A supervised learning algorithm that can be used for regression and classification problems Non-linear model Components Neurons Input Layer Hidden Layer(s) Output Layer Optimizer Function Adam (Adaptive Moment Estimation) Non-linear Activation Functions ReLU, Sigmoid, TanH Softmax - often used in the output layer for multiclass classification Regularization: dropout Loss Function MSE Binary Cross Entropy (Log Loss) Categorical Cross Entropy Forward Propagation: making inference Backward Propagation (Chain Rule): computes derivatives of your cost function with respect to the parameters Pros Cons Can be used for both regression and classification problems Black box Able to solve linearly inseparable problem Require significant amount of data Computationally expensive to train Approaches Gradient Descent Batch Gradient Descent Stochastic Gradient Descent Mini-Batch Gradient Descent </description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,1 +1,21 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url><loc>/notes/machine-learning/k-nearest-neighbors/</loc><changefreq>weekly</changefreq><priority>0.5</priority></url><url><loc>/notes/machine-learning/linear-regression/</loc><changefreq>weekly</changefreq><priority>0.5</priority></url><url><loc>/notes/machine-learning/logistic-regression/</loc><changefreq>weekly</changefreq><priority>0.5</priority></url></urlset>
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+    <url>
+      <loc>/notes/machine-learning/k-nearest-neighbors/</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.5</priority>
+    </url>
+    
+    <url>
+      <loc>/notes/machine-learning/linear-regression/</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.5</priority>
+    </url>
+    
+    <url>
+      <loc>/notes/machine-learning/logistic-regression/</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.5</priority>
+    </url>
+    </urlset>
